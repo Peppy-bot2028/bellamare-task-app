@@ -3,14 +3,14 @@
    ======================================== */
 
 :root {
-  --primary: #1a3a5c;
-  --primary-light: #2a5a8c;
-  --accent: #c8a45a;
-  --bg: #f0f2f5;
+  --primary: #5a1a2a;
+  --primary-light: #7b2e3f;
+  --accent: #c9a84c;
+  --bg: #f5f0f1;
   --white: #ffffff;
-  --text: #1a1a2e;
-  --text-light: #6b7280;
-  --border: #e2e5ea;
+  --text: #2e1a1a;
+  --text-light: #7b6b6b;
+  --border: #e5dede;
   --red: #dc2626;
   --red-bg: #fef2f2;
   --red-border: #fca5a5;
@@ -59,7 +59,8 @@ body {
 }
 .nav-subtitle {
   font-size: 12px;
-  opacity: 0.8;
+  color: var(--accent);
+  opacity: 0.9;
   margin-left: 12px;
 }
 .nav-right {
@@ -69,7 +70,7 @@ body {
 }
 .nav-user {
   font-size: 14px;
-  opacity: 0.9;
+  color: var(--accent);
 }
 
 /* ---- Container ---- */
@@ -98,8 +99,8 @@ body {
 .btn-primary:hover { background: var(--primary-light); }
 .btn-success { background: var(--green); color: var(--white); }
 .btn-danger { background: var(--red); color: var(--white); }
-.btn-outline { background: transparent; border: 1px solid var(--border); color: var(--white); }
-.btn-outline:hover { background: rgba(255,255,255,.1); }
+.btn-outline { background: transparent; border: 1px solid var(--accent); color: var(--accent); }
+.btn-outline:hover { background: rgba(201,168,76,.15); }
 .btn-full { width: 100%; }
 .btn-sm { padding: 6px 14px; font-size: 13px; }
 .btn-xs { padding: 4px 10px; font-size: 12px; }
@@ -309,7 +310,7 @@ body {
 .form-group select:focus {
   outline: none;
   border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(26,58,92,.1);
+  box-shadow: 0 0 0 3px rgba(90,26,42,.15);
 }
 .form-row {
   display: grid;

@@ -208,7 +208,8 @@ async function saveTask(e) {
     description: document.getElementById('taskDesc').value,
     urgency: document.getElementById('taskUrgency').value,
     due_date: document.getElementById('taskDue').value || null,
-    assigned_to: parseInt(document.getElementById('taskAssign').value)
+    assigned_to: parseInt(document.getElementById('taskAssign').value),
+    notify: document.getElementById('taskNotify').checked
   };
 
   const url = taskId ? `/api/tasks/${taskId}` : '/api/tasks';

@@ -81,7 +81,7 @@ router.get('/all', (req, res) => {
 
 // Create task
 router.post('/', (req, res) => {
-  const { title, description, urgency, due_date, assigned_to } = req.body;
+  const { title, description, urgency, due_date, assigned_to, notify } = req.body;
   if (!title) return res.status(400).json({ error: 'Title is required' });
 
   const result = db.prepare(`
@@ -91,8 +91,8 @@ router.post('/', (req, res) => {
 
   const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(result.lastInsertRowid);
 
-  // Send notification if assigned to someone else
-  if (assigned_to && assigned_to !== req.session.userId) {
+  // Send notification if assigned to someone else and notify is enabled
+  if (notify !== false && assigned_to && assigned_to !== req.session.userId) {
     const assignee = db.prepare('SELECT * FROM employees WHERE id = ?').get(assigned_to);
     const assigner = db.prepare('SELECT full_name FROM employees WHERE id = ?').get(req.session.userId);
     if (assignee) {
