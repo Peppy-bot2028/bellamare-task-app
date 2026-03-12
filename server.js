@@ -59,22 +59,33 @@ cron.schedule('0 8 * * *', () => {
   console.log(`[CRON] Sent reminders for ${dueTasks.length} tasks`);
 });
 
-// Test SMTP endpoint (admin only)
+// Test SMTP endpoint (admin only) - sends test email and returns raw error
 app.get('/api/test-smtp', async (req, res) => {
   if (!req.session.userId || !req.session.isAdmin) {
     return res.status(403).json({ error: 'Admin only' });
   }
-  const { sendEmail } = require('./routes/notifications');
+  const nodemailer = require('nodemailer');
   const user = db.prepare('SELECT * FROM employees WHERE id = ?').get(req.session.userId);
+  const transporter = nodemailer.createTransport({
+    host: process.env.SMTP_HOST || 'smtp.office365.com',
+    port: parseInt(process.env.SMTP_PORT || '587'),
+    secure: false,
+    auth: {
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS
+    },
+    tls: { ciphers: 'SSLv3' }
+  });
   try {
-    const result = await sendEmail(
-      user.email,
-      'Test Email from Bellamare Tasks',
-      'If you receive this email, SMTP notifications are working correctly!'
-    );
-    res.json({ success: result, smtpUser: process.env.SMTP_USER ? 'configured' : 'missing', smtpPass: process.env.SMTP_PASS ? 'configured' : 'missing' });
+    const info = await transporter.sendMail({
+      from: `"Bellamare Tasks" <${process.env.SMTP_USER}>`,
+      to: user.email,
+      subject: '[Bellamare Tasks] Test Email',
+      text: 'If you receive this, SMTP notifications are working!'
+    });
+    res.json({ success: true, response: info.response, smtpUser: process.env.SMTP_USER });
   } catch (err) {
-    res.json({ success: false, error: err.message });
+    res.json({ success: false, error: err.message, code: err.code, smtpUser: process.env.SMTP_USER, smtpHost: process.env.SMTP_HOST });
   }
 });
 
