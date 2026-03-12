@@ -37,18 +37,24 @@ function getTransporter() {
   return transporter;
 }
 
-// Send email
+// Send email (HTML with clickable link)
 async function sendEmail(to, subject, text) {
   if (!process.env.SMTP_USER || !process.env.SMTP_PASS || process.env.SMTP_PASS === 'your-email-password-here') {
     console.log(`[EMAIL SKIPPED - SMTP not configured] To: ${to} Subject: ${subject}`);
     return false;
   }
   try {
+    // Convert plain text to HTML, replacing the raw URL with a clickable link
+    const htmlBody = text
+      .replace(/\n/g, '<br>')
+      .replace(APP_URL, `<a href="${APP_URL}" style="color:#6b1d2a;font-weight:bold;">Bellamare/CH Task</a>`);
+
     await getTransporter().sendMail({
       from: `"Bellamare Tasks" <${process.env.SMTP_USER}>`,
       to,
       subject: `[Bellamare Tasks] ${subject}`,
-      text
+      text,
+      html: htmlBody
     });
     console.log(`[EMAIL SENT] To: ${to} Subject: ${subject}`);
     return true;
@@ -93,7 +99,7 @@ async function sendSMS(phone, carrier, message) {
 }
 
 // Send both email and SMS to an employee
-async function sendNotification(employee, subject, message) {
+async function sendNotification(employee, subject, message, smsMessage) {
   const results = { email: false, sms: false };
 
   if (employee.email) {
@@ -101,9 +107,8 @@ async function sendNotification(employee, subject, message) {
   }
 
   if (employee.phone && employee.carrier) {
-    // SMS messages should be shorter
-    const smsText = message.length > 160 ? message.substring(0, 157) + '...' : message;
-    results.sms = await sendSMS(employee.phone, employee.carrier, smsText);
+    // SMS: send a short version with the link always included
+    results.sms = await sendSMS(employee.phone, employee.carrier, smsMessage || message);
   }
 
   return results;

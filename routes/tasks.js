@@ -99,7 +99,8 @@ router.post('/', (req, res) => {
       sendNotification(
         assignee,
         `New Task Assigned: ${title}`,
-        `${assigner.full_name} assigned you a new task: "${title}"\nUrgency: ${urgency || 'green'}\nDue: ${due_date || 'No due date'}\n\nDescription: ${description || 'None'}\n\nLog in: ${APP_URL}`
+        `${assigner.full_name} assigned you a new task: "${title}"\nUrgency: ${urgency || 'green'}\nDue: ${due_date || 'No due date'}\n\nDescription: ${description || 'None'}\n\nLog in: ${APP_URL}`,
+        `New task from ${assigner.full_name}: "${title}"\n${APP_URL}`
       );
     }
   }
@@ -143,7 +144,8 @@ router.put('/:id', (req, res) => {
       sendNotification(
         creator,
         `Task Completed: ${task.title}`,
-        `${completer.full_name} has completed the task: "${task.title}"\n\nCompleted: ${new Date().toLocaleString()}\n\nDescription: ${task.description || 'None'}\n\nLog in: ${APP_URL}`
+        `${completer.full_name} has completed the task: "${task.title}"\n\nCompleted: ${new Date().toLocaleString()}\n\nDescription: ${task.description || 'None'}\n\nLog in: ${APP_URL}`,
+        `${completer.full_name} completed: "${task.title}"\n${APP_URL}`
       );
     }
   }
