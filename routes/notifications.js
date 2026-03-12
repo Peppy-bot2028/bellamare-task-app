@@ -19,15 +19,16 @@ let transporter = null;
 
 function getTransporter() {
   if (!transporter) {
+    const isGmail = (process.env.SMTP_HOST || '').includes('gmail');
     transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST || 'smtp.office365.com',
+      host: process.env.SMTP_HOST || 'smtp.gmail.com',
       port: parseInt(process.env.SMTP_PORT || '587'),
       secure: false,
       auth: {
         user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASS
       },
-      tls: { ciphers: 'SSLv3' }
+      ...(isGmail ? {} : { tls: { ciphers: 'SSLv3' } })
     });
   }
   return transporter;
@@ -68,7 +69,24 @@ async function sendSMS(phone, carrier, message) {
   const cleanPhone = phone.replace(/\D/g, '');
   const smsEmail = `${cleanPhone}@${gateway}`;
 
-  return sendEmail(smsEmail, '', message);
+  // Send directly without subject prefix (carrier gateways work better this way)
+  if (!process.env.SMTP_USER || !process.env.SMTP_PASS || process.env.SMTP_PASS === 'your-email-password-here') {
+    console.log(`[SMS SKIPPED - SMTP not configured] To: ${smsEmail}`);
+    return false;
+  }
+  try {
+    await getTransporter().sendMail({
+      from: process.env.SMTP_FROM || process.env.SMTP_USER,
+      to: smsEmail,
+      subject: '',
+      text: message
+    });
+    console.log(`[SMS SENT] To: ${smsEmail} (${phone} on ${carrier})`);
+    return true;
+  } catch (err) {
+    console.error(`[SMS ERROR] To: ${smsEmail}`, err.message);
+    return false;
+  }
 }
 
 // Send both email and SMS to an employee
