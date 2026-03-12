@@ -76,11 +76,14 @@ if (employeeCount.count === 0) {
     insert.run('tatiana', defaultPassword, 'Tatiana', 'Tatiana@bellamaredevelopment.com', '6015869816', 'att', 0);
     insert.run('annajane', defaultPassword, 'Anna Jane', 'aj@bellamaredevelopment.com', '6019540054', 'att', 0);
     insert.run('sunny', defaultPassword, 'Sunny', 'Sunny@certifiedhm.com', '6016131188', 'att', 0);
+    // Paige - Admin
+    insert.run('paige', adminPassword, 'Paige', 'Paige@bellamaredevelopment.com', '9547340792', 'att', 1);
   });
 
   seedEmployees();
   console.log('All employees seeded successfully!');
   console.log('Admin login: username=john password=BellamareAdmin2026');
+  console.log('Admin login: username=paige password=BellamareAdmin2026');
   console.log('Employee default password: Bellamare2026');
 }
 
