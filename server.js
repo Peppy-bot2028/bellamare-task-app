@@ -4,7 +4,7 @@ const session = require('express-session');
 const path = require('path');
 const cron = require('node-cron');
 const db = require('./database');
-const { sendNotification } = require('./routes/notifications');
+const { sendNotification, APP_URL } = require('./routes/notifications');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -52,7 +52,7 @@ cron.schedule('0 8 * * *', () => {
     sendNotification(
       task,
       `Task Due Tomorrow: ${task.title}`,
-      `Reminder: Your task "${task.title}" is due tomorrow (${task.due_date}).\n\nDescription: ${task.description || 'None'}`
+      `Reminder: Your task "${task.title}" is due tomorrow (${task.due_date}).\n\nDescription: ${task.description || 'None'}\n\nLog in: ${APP_URL}`
     );
   });
 

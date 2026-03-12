@@ -1,6 +1,6 @@
 const express = require('express');
 const db = require('../database');
-const { sendNotification } = require('./notifications');
+const { sendNotification, APP_URL } = require('./notifications');
 const router = express.Router();
 
 // Auth middleware
@@ -99,7 +99,7 @@ router.post('/', (req, res) => {
       sendNotification(
         assignee,
         `New Task Assigned: ${title}`,
-        `${assigner.full_name} assigned you a new task: "${title}"\nUrgency: ${urgency || 'green'}\nDue: ${due_date || 'No due date'}\n\nDescription: ${description || 'None'}`
+        `${assigner.full_name} assigned you a new task: "${title}"\nUrgency: ${urgency || 'green'}\nDue: ${due_date || 'No due date'}\n\nDescription: ${description || 'None'}\n\nLog in: ${APP_URL}`
       );
     }
   }
@@ -143,7 +143,7 @@ router.put('/:id', (req, res) => {
       sendNotification(
         creator,
         `Task Completed: ${task.title}`,
-        `${completer.full_name} has completed the task: "${task.title}"\n\nCompleted: ${new Date().toLocaleString()}\n\nDescription: ${task.description || 'None'}`
+        `${completer.full_name} has completed the task: "${task.title}"\n\nCompleted: ${new Date().toLocaleString()}\n\nDescription: ${task.description || 'None'}\n\nLog in: ${APP_URL}`
       );
     }
   }

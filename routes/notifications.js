@@ -1,5 +1,8 @@
 const nodemailer = require('nodemailer');
 
+// App URL for notification links
+const APP_URL = process.env.APP_URL || 'https://bellamare-tasks-fmf8dceyf2dgfban.canadacentral-01.azurewebsites.net';
+
 // Carrier email-to-SMS gateways
 const CARRIER_GATEWAYS = {
   verizon: 'vtext.com',
@@ -106,4 +109,4 @@ async function sendNotification(employee, subject, message) {
   return results;
 }
 
-module.exports = { sendEmail, sendSMS, sendNotification, CARRIER_GATEWAYS };
+module.exports = { sendEmail, sendSMS, sendNotification, CARRIER_GATEWAYS, APP_URL };
