@@ -59,6 +59,25 @@ cron.schedule('0 8 * * *', () => {
   console.log(`[CRON] Sent reminders for ${dueTasks.length} tasks`);
 });
 
+// Test SMTP endpoint (admin only)
+app.get('/api/test-smtp', async (req, res) => {
+  if (!req.session.userId || !req.session.isAdmin) {
+    return res.status(403).json({ error: 'Admin only' });
+  }
+  const { sendEmail } = require('./routes/notifications');
+  const user = db.prepare('SELECT * FROM employees WHERE id = ?').get(req.session.userId);
+  try {
+    const result = await sendEmail(
+      user.email,
+      'Test Email from Bellamare Tasks',
+      'If you receive this email, SMTP notifications are working correctly!'
+    );
+    res.json({ success: result, smtpUser: process.env.SMTP_USER ? 'configured' : 'missing', smtpPass: process.env.SMTP_PASS ? 'configured' : 'missing' });
+  } catch (err) {
+    res.json({ success: false, error: err.message });
+  }
+});
+
 // SPA fallback - serve index.html for non-API routes
 app.use((req, res, next) => {
   if (req.path.startsWith('/api/')) {
