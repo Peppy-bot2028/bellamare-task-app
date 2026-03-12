@@ -50,7 +50,7 @@ async function sendEmail(to, subject, text) {
       .replace(APP_URL, `<a href="${APP_URL}" style="color:#6b1d2a;font-weight:bold;">Bellamare/CH Task</a>`);
 
     await getTransporter().sendMail({
-      from: `"Bellamare Tasks" <${process.env.SMTP_USER}>`,
+      from: `"Bellamare Office" <${process.env.SMTP_USER}>`,
       to,
       subject: `[Bellamare Tasks] ${subject}`,
       text,
@@ -85,7 +85,7 @@ async function sendSMS(phone, carrier, message) {
   }
   try {
     await getTransporter().sendMail({
-      from: process.env.SMTP_FROM || process.env.SMTP_USER,
+      from: `"Bellamare Office" <${process.env.SMTP_FROM || process.env.SMTP_USER}>`,
       to: smsEmail,
       subject: '',
       text: message
