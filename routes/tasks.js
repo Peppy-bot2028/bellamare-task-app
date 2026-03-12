@@ -134,6 +134,20 @@ router.put('/:id', (req, res) => {
     LEFT JOIN employees c ON t.created_by = c.id
     WHERE t.id = ?
   `).get(req.params.id);
+
+  // Send notification when task is completed
+  if (status === 'completed' && task.status !== 'completed' && task.created_by !== req.session.userId) {
+    const creator = db.prepare('SELECT * FROM employees WHERE id = ?').get(task.created_by);
+    const completer = db.prepare('SELECT full_name FROM employees WHERE id = ?').get(req.session.userId);
+    if (creator && completer) {
+      sendNotification(
+        creator,
+        `Task Completed: ${task.title}`,
+        `${completer.full_name} has completed the task: "${task.title}"\n\nCompleted: ${new Date().toLocaleString()}\n\nDescription: ${task.description || 'None'}`
+      );
+    }
+  }
+
   res.json(updated);
 });
 
