@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bellamare Tasks</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <!-- Top nav -->
+  <header class="navbar">
+    <div class="nav-brand">
+      <h1>BELLAMARE</h1>
+      <span class="nav-subtitle">Task Manager</span>
+    </div>
+    <div class="nav-right">
+      <span id="userName" class="nav-user"></span>
+      <a href="/admin.html" id="adminLink" class="btn btn-sm btn-outline" style="display:none;">Admin Panel</a>
+      <button id="logoutBtn" class="btn btn-sm btn-outline">Logout</button>
+    </div>
+  </header>
+
+  <main class="container">
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab active" data-tab="my-tasks">My Tasks</button>
+      <button class="tab" data-tab="assigned">Tasks I Assigned</button>
+      <button class="tab" data-tab="archive">Completed / Archive</button>
+    </div>
+
+    <!-- Add Task Button -->
+    <div class="toolbar">
+      <button id="addTaskBtn" class="btn btn-primary">+ New Task</button>
+      <div class="filters">
+        <select id="filterUrgency" class="input-sm">
+          <option value="">All Urgencies</option>
+          <option value="red">Urgent (Red)</option>
+          <option value="yellow">Due Soon (Yellow)</option>
+          <option value="green">On Track (Green)</option>
+          <option value="blue">Low Priority (Blue)</option>
+        </select>
+        <input type="text" id="filterSearch" class="input-sm" placeholder="Search tasks...">
+      </div>
+    </div>
+
+    <!-- Task List -->
+    <div id="taskList" class="task-list"></div>
+
+    <!-- Empty State -->
+    <div id="emptyState" class="empty-state" style="display:none;">
+      <p>No tasks to show.</p>
+    </div>
+  </main>
+
+  <!-- New/Edit Task Modal -->
+  <div id="taskModal" class="modal" style="display:none;">
+    <div class="modal-overlay"></div>
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="modalTitle">New Task</h2>
+        <button class="modal-close">&times;</button>
+      </div>
+      <form id="taskForm">
+        <input type="hidden" id="taskId">
+        <div class="form-group">
+          <label for="taskTitle">Task Title *</label>
+          <input type="text" id="taskTitle" required placeholder="What needs to be done?">
+        </div>
+        <div class="form-group">
+          <label for="taskDesc">Description</label>
+          <textarea id="taskDesc" rows="3" placeholder="Add details..."></textarea>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="taskUrgency">Urgency</label>
+            <select id="taskUrgency">
+              <option value="green">On Track (Green)</option>
+              <option value="blue">Low Priority (Blue)</option>
+              <option value="yellow">Due Soon (Yellow)</option>
+              <option value="red">Urgent (Red)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="taskDue">Due Date</label>
+            <input type="date" id="taskDue">
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="taskAssign">Assign To</label>
+          <select id="taskAssign"></select>
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn btn-outline modal-close">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Task</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Task Detail / Notes Modal -->
+  <div id="detailModal" class="modal" style="display:none;">
+    <div class="modal-overlay"></div>
+    <div class="modal-content modal-wide">
+      <div class="modal-header">
+        <h2 id="detailTitle">Task Details</h2>
+        <button class="modal-close">&times;</button>
+      </div>
+      <div id="detailBody" class="detail-body"></div>
+      <div class="notes-section">
+        <h3>Notes</h3>
+        <div id="notesList" class="notes-list"></div>
+        <form id="noteForm" class="note-form">
+          <input type="hidden" id="noteTaskId">
+          <textarea id="noteText" rows="2" placeholder="Add a note..." required></textarea>
+          <button type="submit" class="btn btn-primary btn-sm">Add Note</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/app.js"></script>
+</body>
+</html>

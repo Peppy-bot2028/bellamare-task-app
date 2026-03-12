@@ -1,0 +1,22 @@
+{
+  "name": "bellamare-task-app",
+  "version": "1.0.0",
+  "description": "Bellamare Task Management App",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "better-sqlite3": "^12.6.2",
+    "dotenv": "^17.3.1",
+    "express": "^5.2.1",
+    "express-session": "^1.19.0",
+    "node-cron": "^4.2.1",
+    "nodemailer": "^8.0.2"
+  }
+}

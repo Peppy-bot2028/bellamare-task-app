@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bellamare Tasks - Admin</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header class="navbar">
+    <div class="nav-brand">
+      <h1>BELLAMARE</h1>
+      <span class="nav-subtitle">Admin Panel</span>
+    </div>
+    <div class="nav-right">
+      <a href="/" class="btn btn-sm btn-outline">Back to Tasks</a>
+      <button id="logoutBtn" class="btn btn-sm btn-outline">Logout</button>
+    </div>
+  </header>
+
+  <main class="container">
+    <div class="admin-header">
+      <h2>Employee Management</h2>
+      <button id="addEmployeeBtn" class="btn btn-primary">+ Add Employee</button>
+    </div>
+
+    <div id="employeeList" class="employee-list"></div>
+  </main>
+
+  <!-- Add/Edit Employee Modal -->
+  <div id="empModal" class="modal" style="display:none;">
+    <div class="modal-overlay"></div>
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="empModalTitle">Add Employee</h2>
+        <button class="modal-close">&times;</button>
+      </div>
+      <form id="empForm">
+        <input type="hidden" id="empId">
+        <div class="form-group">
+          <label for="empUsername">Username *</label>
+          <input type="text" id="empUsername" required placeholder="e.g., jsmith">
+        </div>
+        <div class="form-group">
+          <label for="empPassword">Password <span id="pwdHint">*</span></label>
+          <input type="password" id="empPassword" placeholder="Enter password">
+        </div>
+        <div class="form-group">
+          <label for="empName">Full Name *</label>
+          <input type="text" id="empName" required placeholder="e.g., Jane Smith">
+        </div>
+        <div class="form-group">
+          <label for="empEmail">Email *</label>
+          <input type="email" id="empEmail" required placeholder="e.g., jsmith@bellamaredevelopment.com">
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="empPhone">Phone (for SMS)</label>
+            <input type="tel" id="empPhone" placeholder="e.g., 555-123-4567">
+          </div>
+          <div class="form-group">
+            <label for="empCarrier">Carrier</label>
+            <select id="empCarrier">
+              <option value="">-- Select --</option>
+              <option value="verizon">Verizon</option>
+              <option value="att">AT&T</option>
+              <option value="tmobile">T-Mobile</option>
+              <option value="sprint">Sprint</option>
+              <option value="uscellular">US Cellular</option>
+              <option value="metro">Metro PCS</option>
+              <option value="boost">Boost Mobile</option>
+              <option value="cricket">Cricket</option>
+              <option value="googlefi">Google Fi</option>
+              <option value="visible">Visible</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>
+            <input type="checkbox" id="empAdmin"> Make Admin
+          </label>
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn btn-outline modal-close">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Employee</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="/js/admin.js"></script>
+</body>
+</html>
