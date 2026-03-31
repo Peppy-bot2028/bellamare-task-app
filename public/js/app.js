@@ -141,7 +141,8 @@ function renderTasks(tasks) {
         <div class="task-meta">
           <span class="task-due ${isOverdue ? 'overdue' : ''}">${isOverdue ? 'OVERDUE: ' : ''}${dueStr}</span>
           ${currentTab === 'assigned' ? `<span class="task-assignee">Assigned to: ${escapeHtml(t.assigned_to_name || 'Unassigned')}</span>` : ''}
-          ${currentTab === 'my-tasks' ? `<span class="task-assignee">From: ${escapeHtml(t.created_by_name || '')}</span>` : ''}
+          ${currentTab === 'my-tasks' && currentUser.is_admin ? `<span class="task-assignee">Assigned to: ${escapeHtml(t.assigned_to_name || 'Unassigned')} | From: ${escapeHtml(t.created_by_name || '')}</span>` : ''}
+          ${currentTab === 'my-tasks' && !currentUser.is_admin ? `<span class="task-assignee">From: ${escapeHtml(t.created_by_name || '')}</span>` : ''}
         </div>
         <div class="task-actions">
           <button class="btn btn-xs btn-outline task-detail-btn" data-id="${t.id}">Notes & Details</button>

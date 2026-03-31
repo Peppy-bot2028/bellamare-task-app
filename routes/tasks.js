@@ -11,19 +11,20 @@ function requireAuth(req, res, next) {
 
 router.use(requireAuth);
 
-// Get tasks assigned to me
+// Get tasks assigned to me (admins see all tasks)
 router.get('/my-tasks', (req, res) => {
+  const isAdmin = req.session.isAdmin ? 1 : 0;
   const tasks = db.prepare(`
     SELECT t.*, e.full_name as assigned_to_name, c.full_name as created_by_name
     FROM tasks t
     LEFT JOIN employees e ON t.assigned_to = e.id
     LEFT JOIN employees c ON t.created_by = c.id
-    WHERE t.assigned_to = ?
+    WHERE t.assigned_to = ? OR ? = 1
     ORDER BY
       CASE t.status WHEN 'open' THEN 0 ELSE 1 END,
       CASE t.urgency WHEN 'red' THEN 0 WHEN 'yellow' THEN 1 WHEN 'green' THEN 2 WHEN 'blue' THEN 3 END,
       t.due_date ASC
-  `).all(req.session.userId);
+  `).all(req.session.userId, isAdmin);
   res.json(tasks);
 });
 
@@ -91,16 +92,28 @@ router.post('/', (req, res) => {
 
   const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(result.lastInsertRowid);
 
-  // Send notification if assigned to someone else and notify is enabled
-  if (notify !== false && assigned_to && assigned_to !== req.session.userId) {
+  // Send notifications for new task
+  if (notify !== false && assigned_to) {
     const assignee = db.prepare('SELECT * FROM employees WHERE id = ?').get(assigned_to);
-    const assigner = db.prepare('SELECT full_name FROM employees WHERE id = ?').get(req.session.userId);
-    if (assignee) {
+    const assigner = db.prepare('SELECT * FROM employees WHERE id = ?').get(req.session.userId);
+
+    // Notify the assignee
+    if (assignee && assigned_to !== req.session.userId) {
       sendNotification(
         assignee,
         `New Task Assigned: ${title}`,
         `${assigner.full_name} assigned you a new task: "${title}"\nUrgency: ${urgency || 'green'}\nDue: ${due_date || 'No due date'}\n\nDescription: ${description || 'None'}\n\nLog in: ${APP_URL}`,
         `New task from ${assigner.full_name}: "${title}"\n${APP_URL}`
+      );
+    }
+
+    // Notify the sender (confirmation)
+    if (assigner && assigned_to !== req.session.userId) {
+      sendNotification(
+        assigner,
+        `Task Sent: ${title}`,
+        `You assigned a new task to ${assignee.full_name}: "${title}"\nUrgency: ${urgency || 'green'}\nDue: ${due_date || 'No due date'}\n\nDescription: ${description || 'None'}\n\nLog in: ${APP_URL}`,
+        `Task sent to ${assignee.full_name}: "${title}"\n${APP_URL}`
       );
     }
   }
@@ -136,17 +149,32 @@ router.put('/:id', (req, res) => {
     WHERE t.id = ?
   `).get(req.params.id);
 
-  // Send notification when task is completed
-  if (status === 'completed' && task.status !== 'completed' && task.created_by !== req.session.userId) {
+  // Send notification when task is completed (notify both creator and assignee)
+  if (status === 'completed' && task.status !== 'completed') {
     const creator = db.prepare('SELECT * FROM employees WHERE id = ?').get(task.created_by);
+    const assignee = db.prepare('SELECT * FROM employees WHERE id = ?').get(task.assigned_to);
     const completer = db.prepare('SELECT full_name FROM employees WHERE id = ?').get(req.session.userId);
-    if (creator && completer) {
-      sendNotification(
-        creator,
-        `Task Completed: ${task.title}`,
-        `${completer.full_name} has completed the task: "${task.title}"\n\nCompleted: ${new Date().toLocaleString()}\n\nDescription: ${task.description || 'None'}\n\nLog in: ${APP_URL}`,
-        `${completer.full_name} completed: "${task.title}"\n${APP_URL}`
-      );
+
+    if (completer) {
+      // Notify the task creator (if they didn't complete it themselves)
+      if (creator && task.created_by !== req.session.userId) {
+        sendNotification(
+          creator,
+          `Task Completed: ${task.title}`,
+          `${completer.full_name} has completed the task: "${task.title}"\n\nCompleted: ${new Date().toLocaleString()}\n\nDescription: ${task.description || 'None'}\n\nLog in: ${APP_URL}`,
+          `${completer.full_name} completed: "${task.title}"\n${APP_URL}`
+        );
+      }
+
+      // Notify the assignee (if they didn't complete it themselves and are different from creator)
+      if (assignee && task.assigned_to !== req.session.userId && task.assigned_to !== task.created_by) {
+        sendNotification(
+          assignee,
+          `Task Completed: ${task.title}`,
+          `${completer.full_name} has marked your task as complete: "${task.title}"\n\nCompleted: ${new Date().toLocaleString()}\n\nDescription: ${task.description || 'None'}\n\nLog in: ${APP_URL}`,
+          `${completer.full_name} completed: "${task.title}"\n${APP_URL}`
+        );
+      }
     }
   }
 
