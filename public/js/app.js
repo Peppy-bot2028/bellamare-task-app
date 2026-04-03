@@ -1,6 +1,7 @@
 let currentUser = null;
 let currentTab = 'my-tasks';
 let employees = [];
+let timerInterval = null;
 
 // ---- Init ----
 async function init() {
@@ -62,6 +63,10 @@ function setupEventListeners() {
 
   // Note form submit
   document.getElementById('noteForm').addEventListener('submit', addNote);
+
+  // Time tracking buttons
+  document.getElementById('timeStartBtn').addEventListener('click', startTimer);
+  document.getElementById('timeStopBtn').addEventListener('click', stopTimer);
 
   // Modal close buttons
   document.querySelectorAll('.modal-close, .modal-overlay').forEach(el => {
@@ -245,6 +250,7 @@ async function completeTask(id) {
 async function openDetailModal(taskId) {
   const modal = document.getElementById('detailModal');
   document.getElementById('noteTaskId').value = taskId;
+  document.getElementById('timeTaskId').value = taskId;
 
   // Load task details
   const res = await fetch('/api/tasks/all');
@@ -279,7 +285,8 @@ async function openDetailModal(taskId) {
     ${task.description ? `<div class="detail-desc"><strong>Description:</strong><p>${escapeHtml(task.description)}</p></div>` : ''}
   `;
 
-  // Load notes
+  // Load time entries and notes
+  await loadTimeEntries(taskId);
   await loadNotes(taskId);
   modal.style.display = 'flex';
 }
@@ -321,6 +328,134 @@ async function addNote(e) {
     document.getElementById('noteText').value = '';
     await loadNotes(taskId);
   }
+}
+
+// ---- Time Tracking ----
+async function loadTimeEntries(taskId) {
+  const res = await fetch(`/api/tasks/${taskId}/time`);
+  const entries = await res.json();
+  const list = document.getElementById('timeEntries');
+  const totalDisplay = document.getElementById('timeTotalDisplay');
+
+  // Check if current user has a running timer on this task
+  const myRunning = entries.find(e => e.employee_id === currentUser.id && !e.end_time);
+  const startBtn = document.getElementById('timeStartBtn');
+  const stopBtn = document.getElementById('timeStopBtn');
+  const timerDisplay = document.getElementById('timerDisplay');
+
+  if (myRunning) {
+    startBtn.style.display = 'none';
+    stopBtn.style.display = '';
+    timerDisplay.style.display = '';
+    startLiveTimer(myRunning.start_time);
+  } else {
+    startBtn.style.display = '';
+    stopBtn.style.display = 'none';
+    timerDisplay.style.display = 'none';
+    clearInterval(timerInterval);
+  }
+
+  // Calculate total time
+  let totalMinutes = 0;
+  entries.forEach(e => {
+    if (e.end_time) {
+      const start = new Date(e.start_time);
+      const end = new Date(e.end_time);
+      totalMinutes += (end - start) / 60000;
+    }
+  });
+  const totalHrs = Math.floor(totalMinutes / 60);
+  const totalMins = Math.round(totalMinutes % 60);
+  totalDisplay.textContent = entries.length > 0
+    ? `Total time logged: ${totalHrs}h ${totalMins}m`
+    : '';
+
+  if (entries.length === 0) {
+    list.innerHTML = '<p class="no-notes">No time entries yet.</p>';
+    return;
+  }
+
+  list.innerHTML = entries.map(e => {
+    const start = formatTimeCT(e.start_time);
+    const end = e.end_time ? formatTimeCT(e.end_time) : '<span class="timer-running">Running...</span>';
+    let duration = '';
+    if (e.end_time) {
+      const mins = Math.round((new Date(e.end_time) - new Date(e.start_time)) / 60000);
+      const h = Math.floor(mins / 60);
+      const m = mins % 60;
+      duration = `${h}h ${m}m`;
+    }
+    const canDelete = (e.employee_id === currentUser.id || currentUser.is_admin) && e.end_time;
+    return `
+      <div class="time-entry-item">
+        <div class="time-entry-header">
+          <strong>${escapeHtml(e.employee_name)}</strong>
+          ${canDelete ? `<button class="btn btn-xs btn-danger time-delete-btn" data-task-id="${e.task_id}" data-entry-id="${e.id}">&times;</button>` : ''}
+        </div>
+        <div class="time-entry-detail">
+          <span>${start} &mdash; ${end}</span>
+          ${duration ? `<span class="time-entry-duration">${duration}</span>` : ''}
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  list.querySelectorAll('.time-delete-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      if (!confirm('Delete this time entry?')) return;
+      await fetch(`/api/tasks/${btn.dataset.taskId}/time/${btn.dataset.entryId}`, { method: 'DELETE' });
+      await loadTimeEntries(btn.dataset.taskId);
+    });
+  });
+}
+
+function startLiveTimer(startTime) {
+  clearInterval(timerInterval);
+  const display = document.getElementById('timerDisplay');
+  function update() {
+    const now = new Date();
+    const start = new Date(startTime);
+    const diff = Math.max(0, now - start);
+    const secs = Math.floor(diff / 1000) % 60;
+    const mins = Math.floor(diff / 60000) % 60;
+    const hrs = Math.floor(diff / 3600000);
+    display.textContent = `${String(hrs).padStart(2,'0')}:${String(mins).padStart(2,'0')}:${String(secs).padStart(2,'0')}`;
+  }
+  update();
+  timerInterval = setInterval(update, 1000);
+}
+
+async function startTimer() {
+  const taskId = document.getElementById('timeTaskId').value;
+  const res = await fetch(`/api/tasks/${taskId}/time/start`, { method: 'POST' });
+  if (res.ok) {
+    await loadTimeEntries(taskId);
+  } else {
+    const data = await res.json();
+    alert(data.error || 'Failed to start timer');
+  }
+}
+
+async function stopTimer() {
+  const taskId = document.getElementById('timeTaskId').value;
+  const res = await fetch(`/api/tasks/${taskId}/time/stop`, { method: 'POST' });
+  if (res.ok) {
+    clearInterval(timerInterval);
+    await loadTimeEntries(taskId);
+  } else {
+    const data = await res.json();
+    alert(data.error || 'Failed to stop timer');
+  }
+}
+
+function formatTimeCT(dateStr) {
+  const d = new Date(dateStr);
+  return d.toLocaleString('en-US', {
+    timeZone: 'America/Chicago',
+    month: 'short', day: 'numeric',
+    hour: 'numeric', minute: '2-digit',
+    hour12: true
+  }) + ' CT';
 }
 
 // ---- Utilities ----

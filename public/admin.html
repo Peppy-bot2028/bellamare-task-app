@@ -19,12 +19,49 @@
   </header>
 
   <main class="container">
-    <div class="admin-header">
-      <h2>Employee Management</h2>
-      <button id="addEmployeeBtn" class="btn btn-primary">+ Add Employee</button>
+    <!-- Admin Tabs -->
+    <div class="admin-tabs">
+      <button class="admin-tab active" data-tab="employees">Employee Management</button>
+      <button class="admin-tab" data-tab="time-tracking">Time Tracking</button>
     </div>
 
-    <div id="employeeList" class="employee-list"></div>
+    <!-- Employees Section -->
+    <div id="employeesSection">
+      <div class="admin-header">
+        <h2>Employee Management</h2>
+        <button id="addEmployeeBtn" class="btn btn-primary">+ Add Employee</button>
+      </div>
+      <div id="employeeList" class="employee-list"></div>
+    </div>
+
+    <!-- Time Tracking Section -->
+    <div id="timeTrackingSection" style="display:none;">
+      <h2 style="margin-bottom:16px;">Time Tracking Overview</h2>
+      <div class="time-filters">
+        <div class="form-group">
+          <label for="timeFilterEmployee">Employee</label>
+          <select id="timeFilterEmployee">
+            <option value="">All Employees</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="timeFilterTask">Task</label>
+          <select id="timeFilterTask">
+            <option value="">All Tasks</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="timeFilterFrom">From</label>
+          <input type="date" id="timeFilterFrom">
+        </div>
+        <div class="form-group">
+          <label for="timeFilterTo">To</label>
+          <input type="date" id="timeFilterTo">
+        </div>
+        <button id="timeFilterBtn" class="btn btn-primary btn-sm">Filter</button>
+      </div>
+      <div id="timeEntriesTable"></div>
+    </div>
   </main>
 
   <!-- Add/Edit Employee Modal -->

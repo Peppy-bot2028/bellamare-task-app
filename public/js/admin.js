@@ -1,4 +1,5 @@
 let currentUser = null;
+let adminTab = 'employees';
 
 async function init() {
   try {
@@ -9,6 +10,7 @@ async function init() {
   } catch { window.location.href = '/login.html'; return; }
 
   loadEmployees();
+  loadTimeFilters();
   setupEventListeners();
 }
 
@@ -26,6 +28,21 @@ function setupEventListeners() {
       document.querySelectorAll('.modal').forEach(m => m.style.display = 'none');
     });
   });
+
+  // Admin tabs
+  document.querySelectorAll('.admin-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      adminTab = tab.dataset.tab;
+      document.getElementById('employeesSection').style.display = adminTab === 'employees' ? '' : 'none';
+      document.getElementById('timeTrackingSection').style.display = adminTab === 'time-tracking' ? '' : 'none';
+      if (adminTab === 'time-tracking') loadTimeEntries();
+    });
+  });
+
+  // Time filter button
+  document.getElementById('timeFilterBtn').addEventListener('click', loadTimeEntries);
 }
 
 async function loadEmployees() {
@@ -135,6 +152,111 @@ async function deleteEmployee(id) {
     const data = await res.json();
     alert(data.error || 'Failed to delete');
   }
+}
+
+// ---- Time Tracking (Admin) ----
+async function loadTimeFilters() {
+  // Load employees for filter
+  const empRes = await fetch('/api/admin/employees');
+  const employees = await empRes.json();
+  const empSelect = document.getElementById('timeFilterEmployee');
+  employees.forEach(e => {
+    const opt = document.createElement('option');
+    opt.value = e.id;
+    opt.textContent = e.full_name;
+    empSelect.appendChild(opt);
+  });
+
+  // Load tasks for filter
+  const taskRes = await fetch('/api/tasks/all');
+  const tasks = await taskRes.json();
+  const taskSelect = document.getElementById('timeFilterTask');
+  tasks.forEach(t => {
+    const opt = document.createElement('option');
+    opt.value = t.id;
+    opt.textContent = t.title;
+    taskSelect.appendChild(opt);
+  });
+}
+
+async function loadTimeEntries() {
+  const employeeId = document.getElementById('timeFilterEmployee').value;
+  const taskId = document.getElementById('timeFilterTask').value;
+  const dateFrom = document.getElementById('timeFilterFrom').value;
+  const dateTo = document.getElementById('timeFilterTo').value;
+
+  const params = new URLSearchParams();
+  if (employeeId) params.set('employee_id', employeeId);
+  if (taskId) params.set('task_id', taskId);
+  if (dateFrom) params.set('date_from', dateFrom);
+  if (dateTo) params.set('date_to', dateTo);
+
+  const res = await fetch(`/api/admin/time-entries?${params}`);
+  const entries = await res.json();
+
+  const container = document.getElementById('timeEntriesTable');
+
+  if (entries.length === 0) {
+    container.innerHTML = '<p style="text-align:center;color:#7b6b6b;padding:40px;">No time entries found.</p>';
+    return;
+  }
+
+  let totalMinutes = 0;
+  entries.forEach(e => {
+    if (e.end_time) {
+      totalMinutes += (new Date(e.end_time) - new Date(e.start_time)) / 60000;
+    }
+  });
+  const totalHrs = Math.floor(totalMinutes / 60);
+  const totalMins = Math.round(totalMinutes % 60);
+
+  container.innerHTML = `
+    <table class="time-table">
+      <thead>
+        <tr>
+          <th>Employee</th>
+          <th>Task</th>
+          <th>Start (CT)</th>
+          <th>End (CT)</th>
+          <th>Duration</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${entries.map(e => {
+          const start = formatTimeCT(e.start_time);
+          const end = e.end_time ? formatTimeCT(e.end_time) : '<em>Running...</em>';
+          let duration = '-';
+          if (e.end_time) {
+            const mins = Math.round((new Date(e.end_time) - new Date(e.start_time)) / 60000);
+            const h = Math.floor(mins / 60);
+            const m = mins % 60;
+            duration = h + 'h ' + m + 'm';
+          }
+          return `<tr>
+            <td>${escapeHtml(e.employee_name)}</td>
+            <td>${escapeHtml(e.task_title)}</td>
+            <td>${start}</td>
+            <td>${end}</td>
+            <td>${duration}</td>
+          </tr>`;
+        }).join('')}
+        <tr class="total-row">
+          <td colspan="4" style="text-align:right;">Total Completed Time:</td>
+          <td>${totalHrs}h ${totalMins}m</td>
+        </tr>
+      </tbody>
+    </table>
+  `;
+}
+
+function formatTimeCT(dateStr) {
+  const d = new Date(dateStr);
+  return d.toLocaleString('en-US', {
+    timeZone: 'America/Chicago',
+    month: 'short', day: 'numeric',
+    hour: 'numeric', minute: '2-digit',
+    hour12: true
+  });
 }
 
 function escapeHtml(str) {

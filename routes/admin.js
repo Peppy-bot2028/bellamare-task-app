@@ -84,4 +84,40 @@ router.get('/carriers', (req, res) => {
   res.json(Object.keys(CARRIER_GATEWAYS));
 });
 
+// Get all time entries (admin view) with optional filters
+router.get('/time-entries', (req, res) => {
+  const { employee_id, task_id, date_from, date_to } = req.query;
+
+  let query = `
+    SELECT te.*, e.full_name as employee_name, t.title as task_title
+    FROM time_entries te
+    JOIN employees e ON te.employee_id = e.id
+    JOIN tasks t ON te.task_id = t.id
+    WHERE 1=1
+  `;
+  const params = [];
+
+  if (employee_id) {
+    query += ' AND te.employee_id = ?';
+    params.push(employee_id);
+  }
+  if (task_id) {
+    query += ' AND te.task_id = ?';
+    params.push(task_id);
+  }
+  if (date_from) {
+    query += ' AND te.start_time >= ?';
+    params.push(date_from);
+  }
+  if (date_to) {
+    query += ' AND te.start_time <= ?';
+    params.push(date_to + ' 23:59:59');
+  }
+
+  query += ' ORDER BY te.start_time DESC';
+
+  const entries = db.prepare(query).all(...params);
+  res.json(entries);
+});
+
 module.exports = router;
