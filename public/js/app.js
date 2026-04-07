@@ -279,8 +279,10 @@ async function openDetailModal(taskId) {
     ${task.description ? `<div class="detail-desc"><strong>Description:</strong><p>${escapeHtml(task.description)}</p></div>` : ''}
   `;
 
-  // Load notes
+  // Load notes and time entries
   await loadNotes(taskId);
+  await loadTimeEntries(taskId);
+  setupTimerButtons(taskId);
   modal.style.display = 'flex';
 }
 
@@ -321,6 +323,157 @@ async function addNote(e) {
     document.getElementById('noteText').value = '';
     await loadNotes(taskId);
   }
+}
+
+// ---- Time Tracking ----
+let timerInterval = null;
+
+function setupTimerButtons(taskId) {
+  const startBtn = document.getElementById('timerStartBtn');
+  const stopBtn = document.getElementById('timerStopBtn');
+  const runningEl = document.getElementById('timerRunning');
+
+  // Remove old listeners by cloning
+  const newStart = startBtn.cloneNode(true);
+  const newStop = stopBtn.cloneNode(true);
+  startBtn.parentNode.replaceChild(newStart, startBtn);
+  stopBtn.parentNode.replaceChild(newStop, stopBtn);
+
+  newStart.addEventListener('click', () => startTimer(taskId));
+  newStop.addEventListener('click', () => stopTimer(taskId));
+}
+
+async function startTimer(taskId) {
+  const res = await fetch(`/api/tasks/${taskId}/time/start`, { method: 'POST' });
+  if (!res.ok) {
+    const data = await res.json();
+    alert(data.error || 'Failed to start timer');
+    return;
+  }
+  await loadTimeEntries(taskId);
+}
+
+async function stopTimer(taskId) {
+  const res = await fetch(`/api/tasks/${taskId}/time/stop`, { method: 'POST' });
+  if (!res.ok) {
+    const data = await res.json();
+    alert(data.error || 'Failed to stop timer');
+    return;
+  }
+  if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+  await loadTimeEntries(taskId);
+}
+
+async function loadTimeEntries(taskId) {
+  const res = await fetch(`/api/tasks/${taskId}/time`);
+  const entries = await res.json();
+  const list = document.getElementById('timeEntries');
+  const startBtn = document.getElementById('timerStartBtn');
+  const stopBtn = document.getElementById('timerStopBtn');
+  const runningEl = document.getElementById('timerRunning');
+  const totalRow = document.getElementById('timeTotalRow');
+  const totalEl = document.getElementById('timeTotal');
+
+  // Check for running timer
+  const myRunning = entries.find(e => !e.end_time && e.employee_id === currentUser.id);
+
+  if (myRunning) {
+    startBtn.style.display = 'none';
+    stopBtn.style.display = '';
+    runningEl.style.display = '';
+    // Start live counter
+    if (timerInterval) clearInterval(timerInterval);
+    timerInterval = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - new Date(myRunning.start_time).getTime()) / 1000);
+      document.getElementById('timerElapsed').textContent = formatDurationHMS(elapsed);
+    }, 1000);
+  } else {
+    startBtn.style.display = '';
+    stopBtn.style.display = 'none';
+    runningEl.style.display = 'none';
+    if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+  }
+
+  if (entries.length === 0) {
+    list.innerHTML = '<p class="no-time">No time logged yet.</p>';
+    totalRow.style.display = 'none';
+    return;
+  }
+
+  let totalMinutes = 0;
+
+  list.innerHTML = entries.map(e => {
+    const start = new Date(e.start_time);
+    const startStr = formatTimeCT(start);
+
+    if (!e.end_time) {
+      return `
+        <div class="time-entry time-entry-running">
+          <div class="time-entry-info">
+            <div class="time-entry-name">${escapeHtml(e.employee_name)}</div>
+            <div class="time-entry-range">${formatDateShort(start)} ${startStr} — running...</div>
+          </div>
+          <div class="time-entry-duration">⏱ Active</div>
+        </div>
+      `;
+    }
+
+    const end = new Date(e.end_time);
+    const endStr = formatTimeCT(end);
+    const mins = Math.round((end - start) / 60000);
+    totalMinutes += mins;
+    const canDelete = e.employee_id === currentUser.id || currentUser.is_admin;
+
+    return `
+      <div class="time-entry">
+        <div class="time-entry-info">
+          <div class="time-entry-name">${escapeHtml(e.employee_name)}</div>
+          <div class="time-entry-range">${formatDateShort(start)} ${startStr} — ${endStr}</div>
+        </div>
+        <div class="time-entry-duration">${formatDurationShort(mins)}</div>
+        ${canDelete ? `<button class="time-entry-delete" data-task="${taskId}" data-entry="${e.id}" title="Delete">&times;</button>` : ''}
+      </div>
+    `;
+  }).join('');
+
+  // Show total
+  if (totalMinutes > 0) {
+    totalRow.style.display = '';
+    totalEl.textContent = formatDurationShort(totalMinutes);
+  } else {
+    totalRow.style.display = 'none';
+  }
+
+  // Attach delete handlers
+  list.querySelectorAll('.time-entry-delete').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      if (!confirm('Delete this time entry?')) return;
+      await fetch(`/api/tasks/${btn.dataset.task}/time/${btn.dataset.entry}`, { method: 'DELETE' });
+      await loadTimeEntries(taskId);
+    });
+  });
+}
+
+function formatDurationHMS(seconds) {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+
+function formatDurationShort(mins) {
+  if (mins < 60) return `${mins}m`;
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return m > 0 ? `${h}h ${m}m` : `${h}h`;
+}
+
+function formatTimeCT(date) {
+  return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/Chicago' });
+}
+
+function formatDateShort(date) {
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'America/Chicago' });
 }
 
 // ---- Utilities ----

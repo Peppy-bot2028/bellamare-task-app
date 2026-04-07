@@ -386,6 +386,114 @@ body {
   resize: vertical;
 }
 
+/* ---- Time Tracking ---- */
+.time-section {
+  border-top: 1px solid var(--border);
+  padding-top: 16px;
+  margin-top: 16px;
+}
+.time-section h3 { font-size: 16px; margin-bottom: 12px; }
+.time-controls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.timer-running {
+  font-size: 13px;
+  color: var(--red);
+  font-weight: 600;
+  animation: pulse 1.5s infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+.time-entries-list { margin-bottom: 8px; }
+.time-entry {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 10px;
+  background: var(--bg);
+  border-radius: var(--radius);
+  margin-bottom: 6px;
+  font-size: 13px;
+}
+.time-entry-info { flex: 1; }
+.time-entry-name { font-weight: 600; font-size: 12px; color: var(--primary); }
+.time-entry-range { color: var(--text-light); font-size: 12px; }
+.time-entry-duration { font-weight: 700; font-size: 13px; margin: 0 12px; }
+.time-entry-running { color: var(--red); }
+.time-entry-delete {
+  background: none;
+  border: none;
+  color: var(--text-light);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 2px 6px;
+}
+.time-entry-delete:hover { color: var(--red); }
+.time-total {
+  text-align: right;
+  font-size: 14px;
+  color: var(--text);
+  padding: 8px 0;
+  border-top: 1px solid var(--border);
+}
+.no-time { color: var(--text-light); font-size: 13px; font-style: italic; }
+
+/* ---- Time Report (Admin) ---- */
+.time-report-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.time-report-table th {
+  text-align: left;
+  padding: 10px 12px;
+  background: var(--primary);
+  color: var(--white);
+  font-weight: 600;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.time-report-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.time-report-table tr:nth-child(even) { background: var(--bg); }
+.time-report-filters {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.time-summary-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.time-summary-card {
+  background: var(--white);
+  border-radius: var(--radius);
+  padding: 16px;
+  box-shadow: var(--shadow);
+  text-align: center;
+}
+.time-summary-card .time-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--primary);
+}
+.time-summary-card .time-label {
+  font-size: 12px;
+  color: var(--text-light);
+  margin-top: 4px;
+}
+
 /* ---- Login Page ---- */
 .login-page {
   background: var(--primary);

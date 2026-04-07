@@ -19,12 +19,36 @@
   </header>
 
   <main class="container">
-    <div class="admin-header">
-      <h2>Employee Management</h2>
-      <button id="addEmployeeBtn" class="btn btn-primary">+ Add Employee</button>
+    <!-- Admin Tabs -->
+    <div class="tabs" style="margin-bottom:20px;">
+      <button class="tab active" data-admin-tab="employees">Employee Management</button>
+      <button class="tab" data-admin-tab="time-report">Time Report</button>
     </div>
 
-    <div id="employeeList" class="employee-list"></div>
+    <!-- Employees Tab -->
+    <div id="employeesTab">
+      <div class="admin-header">
+        <h2>Employee Management</h2>
+        <button id="addEmployeeBtn" class="btn btn-primary">+ Add Employee</button>
+      </div>
+      <div id="employeeList" class="employee-list"></div>
+    </div>
+
+    <!-- Time Report Tab -->
+    <div id="timeReportTab" style="display:none;">
+      <div class="admin-header">
+        <h2>Time Report</h2>
+      </div>
+      <div class="time-report-filters">
+        <select id="timeFilterEmployee" class="input-sm">
+          <option value="">All Employees</option>
+        </select>
+        <input type="date" id="timeFilterFrom" class="input-sm" placeholder="From">
+        <input type="date" id="timeFilterTo" class="input-sm" placeholder="To">
+      </div>
+      <div id="timeSummary" class="time-summary-cards"></div>
+      <div id="timeReportTable"></div>
+    </div>
   </main>
 
   <!-- Add/Edit Employee Modal -->

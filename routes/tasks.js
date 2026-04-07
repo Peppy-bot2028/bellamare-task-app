@@ -80,6 +80,31 @@ router.get('/all', (req, res) => {
   res.json(tasks);
 });
 
+// Get all time entries (admin only) - for time report
+router.get('/admin/time-report', (req, res) => {
+  if (!req.session.isAdmin) return res.status(403).json({ error: 'Admin only' });
+
+  const entries = db.prepare(`
+    SELECT te.*, e.full_name as employee_name, t.title as task_title
+    FROM time_entries te
+    JOIN employees e ON te.employee_id = e.id
+    JOIN tasks t ON te.task_id = t.id
+    ORDER BY te.start_time DESC
+  `).all();
+  res.json(entries);
+});
+
+// Get current running timer for user
+router.get('/my/active-timer', (req, res) => {
+  const running = db.prepare(`
+    SELECT te.*, t.title as task_title
+    FROM time_entries te
+    JOIN tasks t ON te.task_id = t.id
+    WHERE te.employee_id = ? AND te.end_time IS NULL
+  `).get(req.session.userId);
+  res.json(running || null);
+});
+
 // Create task
 router.post('/', (req, res) => {
   const { title, description, urgency, due_date, assigned_to, notify } = req.body;
@@ -221,6 +246,107 @@ router.post('/:id/notes', (req, res) => {
   `).get(result.lastInsertRowid);
 
   res.json(newNote);
+});
+
+// ---- Time Tracking ----
+
+// Get time entries for a task
+router.get('/:id/time', (req, res) => {
+  const entries = db.prepare(`
+    SELECT te.*, e.full_name as employee_name
+    FROM time_entries te
+    JOIN employees e ON te.employee_id = e.id
+    WHERE te.task_id = ?
+    ORDER BY te.start_time DESC
+  `).all(req.params.id);
+  res.json(entries);
+});
+
+// Start timer on a task
+router.post('/:id/time/start', (req, res) => {
+  const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id);
+  if (!task) return res.status(404).json({ error: 'Task not found' });
+
+  // Check if user already has a running timer on ANY task
+  const running = db.prepare(`
+    SELECT te.*, t.title as task_title FROM time_entries te
+    JOIN tasks t ON te.task_id = t.id
+    WHERE te.employee_id = ? AND te.end_time IS NULL
+  `).get(req.session.userId);
+
+  if (running) {
+    return res.status(400).json({ error: `You already have a timer running on "${running.task_title}". Stop it first.` });
+  }
+
+  // Use Central Time
+  const now = new Date().toLocaleString('en-US', { timeZone: 'America/Chicago' });
+  const ctNow = new Date(now).toISOString();
+
+  const result = db.prepare(`
+    INSERT INTO time_entries (task_id, employee_id, start_time)
+    VALUES (?, ?, ?)
+  `).run(req.params.id, req.session.userId, ctNow);
+
+  const entry = db.prepare('SELECT * FROM time_entries WHERE id = ?').get(result.lastInsertRowid);
+  res.json(entry);
+});
+
+// Stop timer on a task
+router.post('/:id/time/stop', (req, res) => {
+  const running = db.prepare(`
+    SELECT * FROM time_entries
+    WHERE task_id = ? AND employee_id = ? AND end_time IS NULL
+  `).get(req.params.id, req.session.userId);
+
+  if (!running) {
+    return res.status(400).json({ error: 'No running timer found for this task' });
+  }
+
+  const now = new Date().toLocaleString('en-US', { timeZone: 'America/Chicago' });
+  const ctNow = new Date(now).toISOString();
+
+  db.prepare('UPDATE time_entries SET end_time = ? WHERE id = ?').run(ctNow, running.id);
+
+  const entry = db.prepare(`
+    SELECT te.*, e.full_name as employee_name
+    FROM time_entries te
+    JOIN employees e ON te.employee_id = e.id
+    WHERE te.id = ?
+  `).get(running.id);
+  res.json(entry);
+});
+
+// Add manual time entry
+router.post('/:id/time/manual', (req, res) => {
+  const { start_time, end_time } = req.body;
+  if (!start_time || !end_time) return res.status(400).json({ error: 'Start and end time are required' });
+
+  const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id);
+  if (!task) return res.status(404).json({ error: 'Task not found' });
+
+  const result = db.prepare(`
+    INSERT INTO time_entries (task_id, employee_id, start_time, end_time)
+    VALUES (?, ?, ?, ?)
+  `).run(req.params.id, req.session.userId, start_time, end_time);
+
+  const entry = db.prepare(`
+    SELECT te.*, e.full_name as employee_name
+    FROM time_entries te
+    JOIN employees e ON te.employee_id = e.id
+    WHERE te.id = ?
+  `).get(result.lastInsertRowid);
+  res.json(entry);
+});
+
+// Delete time entry (own entries only, or admin)
+router.delete('/:id/time/:entryId', (req, res) => {
+  const entry = db.prepare('SELECT * FROM time_entries WHERE id = ?').get(req.params.entryId);
+  if (!entry) return res.status(404).json({ error: 'Time entry not found' });
+  if (entry.employee_id !== req.session.userId && !req.session.isAdmin) {
+    return res.status(403).json({ error: 'Not authorized' });
+  }
+  db.prepare('DELETE FROM time_entries WHERE id = ?').run(req.params.entryId);
+  res.json({ message: 'Time entry deleted' });
 });
 
 module.exports = router;

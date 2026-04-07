@@ -110,6 +110,20 @@
         <button class="modal-close">&times;</button>
       </div>
       <div id="detailBody" class="detail-body"></div>
+      <!-- Time Tracking Section -->
+      <div class="time-section">
+        <h3>Time Tracking</h3>
+        <div class="time-controls">
+          <button id="timerStartBtn" class="btn btn-success btn-sm">Start Timer</button>
+          <button id="timerStopBtn" class="btn btn-danger btn-sm" style="display:none;">Stop Timer</button>
+          <span id="timerRunning" class="timer-running" style="display:none;">Running: <span id="timerElapsed">00:00:00</span></span>
+        </div>
+        <div id="timeEntries" class="time-entries-list"></div>
+        <div id="timeTotalRow" class="time-total" style="display:none;">
+          Total: <strong id="timeTotal">0h 0m</strong>
+        </div>
+      </div>
+
       <div class="notes-section">
         <h3>Notes</h3>
         <div id="notesList" class="notes-list"></div>
