@@ -25,16 +25,30 @@ async function init() {
   setupEventListeners();
 }
 
-function populateAssignDropdown() {
-  const sel = document.getElementById('taskAssign');
-  sel.innerHTML = '';
+function populateAssignDropdown(selectedIds) {
+  const container = document.getElementById('taskAssign');
+  container.innerHTML = '';
+  const selected = selectedIds && selectedIds.length
+    ? selectedIds.map(Number)
+    : [currentUser.id];
   employees.forEach(e => {
-    const opt = document.createElement('option');
-    opt.value = e.id;
-    opt.textContent = e.full_name;
-    if (e.id === currentUser.id) opt.selected = true;
-    sel.appendChild(opt);
+    const label = document.createElement('label');
+    label.className = 'assignee-option';
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.value = e.id;
+    cb.checked = selected.includes(e.id);
+    label.appendChild(cb);
+    const span = document.createElement('span');
+    span.textContent = e.full_name;
+    label.appendChild(span);
+    container.appendChild(label);
   });
+}
+
+function getSelectedAssignees() {
+  return Array.from(document.querySelectorAll('#taskAssign input[type="checkbox"]:checked'))
+    .map(cb => parseInt(cb.value));
 }
 
 // ---- Event Listeners ----
@@ -145,8 +159,8 @@ function renderTasks(tasks) {
         <p class="task-desc">${escapeHtml(t.description || '')}</p>
         <div class="task-meta">
           <span class="task-due ${isOverdue ? 'overdue' : ''}">${isOverdue ? 'OVERDUE: ' : ''}${dueStr}</span>
-          ${currentTab === 'assigned' ? `<span class="task-assignee">Assigned to: ${escapeHtml(t.assigned_to_name || 'Unassigned')}</span>` : ''}
-          ${currentTab === 'my-tasks' && currentUser.is_admin ? `<span class="task-assignee">Assigned to: ${escapeHtml(t.assigned_to_name || 'Unassigned')} | From: ${escapeHtml(t.created_by_name || '')}</span>` : ''}
+          ${currentTab === 'assigned' ? `<span class="task-assignee">Assigned to: ${escapeHtml(t.assigned_to_names || 'Unassigned')}</span>` : ''}
+          ${currentTab === 'my-tasks' && currentUser.is_admin ? `<span class="task-assignee">Assigned to: ${escapeHtml(t.assigned_to_names || 'Unassigned')} | From: ${escapeHtml(t.created_by_name || '')}</span>` : ''}
           ${currentTab === 'my-tasks' && !currentUser.is_admin ? `<span class="task-assignee">From: ${escapeHtml(t.created_by_name || '')}</span>` : ''}
         </div>
         <div class="task-actions">
@@ -184,7 +198,6 @@ async function openTaskModal(taskId) {
   const title = document.getElementById('modalTitle');
   document.getElementById('taskId').value = '';
   document.getElementById('taskForm').reset();
-  populateAssignDropdown();
 
   if (taskId) {
     title.textContent = 'Edit Task';
@@ -197,10 +210,13 @@ async function openTaskModal(taskId) {
       document.getElementById('taskDesc').value = task.description || '';
       document.getElementById('taskUrgency').value = task.urgency;
       document.getElementById('taskDue').value = task.due_date || '';
-      document.getElementById('taskAssign').value = task.assigned_to;
+      populateAssignDropdown(task.assignee_ids || []);
+    } else {
+      populateAssignDropdown();
     }
   } else {
     title.textContent = 'New Task';
+    populateAssignDropdown();
   }
 
   modal.style.display = 'flex';
@@ -209,12 +225,17 @@ async function openTaskModal(taskId) {
 async function saveTask(e) {
   e.preventDefault();
   const taskId = document.getElementById('taskId').value;
+  const assigneeIds = getSelectedAssignees();
+  if (assigneeIds.length === 0) {
+    alert('Please select at least one person to assign this task to.');
+    return;
+  }
   const body = {
     title: document.getElementById('taskTitle').value,
     description: document.getElementById('taskDesc').value,
     urgency: document.getElementById('taskUrgency').value,
     due_date: document.getElementById('taskDue').value || null,
-    assigned_to: parseInt(document.getElementById('taskAssign').value),
+    assigned_to: assigneeIds,
     notify: document.getElementById('taskNotify').checked
   };
 
@@ -273,7 +294,7 @@ async function openDetailModal(taskId) {
         <strong>Due Date:</strong> ${task.due_date ? formatDate(task.due_date) : 'None'}
       </div>
       <div class="detail-item">
-        <strong>Assigned To:</strong> ${escapeHtml(task.assigned_to_name || 'Unassigned')}
+        <strong>Assigned To:</strong> ${escapeHtml(task.assigned_to_names || 'Unassigned')}
       </div>
       <div class="detail-item">
         <strong>Created By:</strong> ${escapeHtml(task.created_by_name || '')}

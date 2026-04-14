@@ -60,7 +60,30 @@ db.exec(`
     end_time DATETIME,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
+
+  CREATE TABLE IF NOT EXISTS task_assignees (
+    task_id INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+    employee_id INTEGER NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
+    PRIMARY KEY (task_id, employee_id)
+  );
 `);
+
+// Migrate existing single-assignee tasks into task_assignees join table
+const tasksToMigrate = db.prepare(`
+  SELECT id, assigned_to FROM tasks
+  WHERE assigned_to IS NOT NULL
+  AND NOT EXISTS (SELECT 1 FROM task_assignees WHERE task_id = tasks.id)
+`).all();
+if (tasksToMigrate.length > 0) {
+  const migrateInsert = db.prepare('INSERT OR IGNORE INTO task_assignees (task_id, employee_id) VALUES (?, ?)');
+  const migrate = db.transaction(() => {
+    tasksToMigrate.forEach(t => {
+      if (t.assigned_to) migrateInsert.run(t.id, t.assigned_to);
+    });
+  });
+  migrate();
+  console.log(`Migrated ${tasksToMigrate.length} tasks to task_assignees table`);
+}
 
 // Seed employees if none exist
 const employeeCount = db.prepare('SELECT COUNT(*) as count FROM employees').get();

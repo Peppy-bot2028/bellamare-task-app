@@ -11,29 +11,60 @@ function requireAuth(req, res, next) {
 
 router.use(requireAuth);
 
+// Helper: attach assignees (array of {id, full_name}) to a task or array of tasks
+function enrichWithAssignees(taskOrTasks) {
+  const stmt = db.prepare(`
+    SELECT e.id, e.full_name
+    FROM task_assignees ta
+    JOIN employees e ON ta.employee_id = e.id
+    WHERE ta.task_id = ?
+    ORDER BY e.full_name
+  `);
+  const enrich = (t) => {
+    const assignees = stmt.all(t.id);
+    t.assignees = assignees;
+    t.assignee_ids = assignees.map(a => a.id);
+    t.assigned_to_names = assignees.map(a => a.full_name).join(', ') || 'Unassigned';
+    return t;
+  };
+  return Array.isArray(taskOrTasks) ? taskOrTasks.map(enrich) : enrich(taskOrTasks);
+}
+
+// Helper: replace a task's assignees, returns array of assignee IDs
+function setTaskAssignees(taskId, assigneeIds) {
+  const ids = Array.isArray(assigneeIds) ? assigneeIds : (assigneeIds ? [assigneeIds] : []);
+  const clean = [...new Set(ids.map(Number).filter(n => !isNaN(n)))];
+  const txn = db.transaction(() => {
+    db.prepare('DELETE FROM task_assignees WHERE task_id = ?').run(taskId);
+    const insert = db.prepare('INSERT OR IGNORE INTO task_assignees (task_id, employee_id) VALUES (?, ?)');
+    clean.forEach(empId => insert.run(taskId, empId));
+  });
+  txn();
+  return clean;
+}
+
 // Get tasks assigned to me (admins see all tasks)
 router.get('/my-tasks', (req, res) => {
   const isAdmin = req.session.isAdmin ? 1 : 0;
   const tasks = db.prepare(`
-    SELECT t.*, e.full_name as assigned_to_name, c.full_name as created_by_name
+    SELECT DISTINCT t.*, c.full_name as created_by_name
     FROM tasks t
-    LEFT JOIN employees e ON t.assigned_to = e.id
     LEFT JOIN employees c ON t.created_by = c.id
-    WHERE t.assigned_to = ? OR ? = 1
+    LEFT JOIN task_assignees ta ON t.id = ta.task_id
+    WHERE ta.employee_id = ? OR ? = 1
     ORDER BY
       CASE t.status WHEN 'open' THEN 0 ELSE 1 END,
       CASE t.urgency WHEN 'red' THEN 0 WHEN 'yellow' THEN 1 WHEN 'green' THEN 2 WHEN 'blue' THEN 3 END,
       t.due_date ASC
   `).all(req.session.userId, isAdmin);
-  res.json(tasks);
+  res.json(enrichWithAssignees(tasks));
 });
 
 // Get tasks I created/assigned to others
 router.get('/assigned-by-me', (req, res) => {
   const tasks = db.prepare(`
-    SELECT t.*, e.full_name as assigned_to_name, c.full_name as created_by_name
+    SELECT t.*, c.full_name as created_by_name
     FROM tasks t
-    LEFT JOIN employees e ON t.assigned_to = e.id
     LEFT JOIN employees c ON t.created_by = c.id
     WHERE t.created_by = ?
     ORDER BY
@@ -41,7 +72,7 @@ router.get('/assigned-by-me', (req, res) => {
       CASE t.urgency WHEN 'red' THEN 0 WHEN 'yellow' THEN 1 WHEN 'green' THEN 2 WHEN 'blue' THEN 3 END,
       t.due_date ASC
   `).all(req.session.userId);
-  res.json(tasks);
+  res.json(enrichWithAssignees(tasks));
 });
 
 // Get all tasks (admin or for archive view)
@@ -51,11 +82,11 @@ router.get('/all', (req, res) => {
   const search = req.query.search || null;
 
   let query = `
-    SELECT t.*, e.full_name as assigned_to_name, c.full_name as created_by_name
+    SELECT DISTINCT t.*, c.full_name as created_by_name
     FROM tasks t
-    LEFT JOIN employees e ON t.assigned_to = e.id
     LEFT JOIN employees c ON t.created_by = c.id
-    WHERE (t.assigned_to = ? OR t.created_by = ? OR ? = 1)
+    LEFT JOIN task_assignees ta ON t.id = ta.task_id
+    WHERE (ta.employee_id = ? OR t.created_by = ? OR ? = 1)
   `;
   const params = [req.session.userId, req.session.userId, req.session.isAdmin ? 1 : 0];
 
@@ -77,7 +108,7 @@ router.get('/all', (req, res) => {
     t.created_at DESC`;
 
   const tasks = db.prepare(query).all(...params);
-  res.json(tasks);
+  res.json(enrichWithAssignees(tasks));
 });
 
 // Create task
@@ -85,35 +116,50 @@ router.post('/', (req, res) => {
   const { title, description, urgency, due_date, assigned_to, notify } = req.body;
   if (!title) return res.status(400).json({ error: 'Title is required' });
 
+  // Normalize assigned_to to an array
+  let assigneeIds = Array.isArray(assigned_to) ? assigned_to : (assigned_to ? [assigned_to] : []);
+  assigneeIds = [...new Set(assigneeIds.map(Number).filter(n => !isNaN(n)))];
+  if (assigneeIds.length === 0) assigneeIds = [req.session.userId];
+
+  // Store the first assignee on the legacy tasks.assigned_to column for backward compat
+  const primaryAssignee = assigneeIds[0];
+
   const result = db.prepare(`
     INSERT INTO tasks (title, description, urgency, due_date, assigned_to, created_by)
     VALUES (?, ?, ?, ?, ?, ?)
-  `).run(title, description || '', urgency || 'green', due_date || null, assigned_to || req.session.userId, req.session.userId);
+  `).run(title, description || '', urgency || 'green', due_date || null, primaryAssignee, req.session.userId);
 
-  const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(result.lastInsertRowid);
+  const taskId = result.lastInsertRowid;
+  setTaskAssignees(taskId, assigneeIds);
+
+  const task = enrichWithAssignees(db.prepare('SELECT * FROM tasks WHERE id = ?').get(taskId));
 
   // Send notifications for new task
-  if (notify !== false && assigned_to) {
-    const assignee = db.prepare('SELECT * FROM employees WHERE id = ?').get(assigned_to);
+  if (notify !== false && assigneeIds.length > 0) {
     const assigner = db.prepare('SELECT * FROM employees WHERE id = ?').get(req.session.userId);
+    const assignees = assigneeIds
+      .filter(id => id !== req.session.userId)
+      .map(id => db.prepare('SELECT * FROM employees WHERE id = ?').get(id))
+      .filter(Boolean);
+    const assigneeNames = assignees.map(a => a.full_name).join(', ');
 
-    // Notify the assignee
-    if (assignee && assigned_to !== req.session.userId) {
+    // Notify each assignee
+    assignees.forEach(assignee => {
       sendNotification(
         assignee,
         `New Task Assigned: ${title}`,
         `${assigner.full_name} assigned you a new task: "${title}"\nUrgency: ${urgency || 'green'}\nDue: ${due_date || 'No due date'}\n\nDescription: ${description || 'None'}\n\nLog in: ${APP_URL}`,
         `New task from ${assigner.full_name}: "${title}"\n${APP_URL}`
       );
-    }
+    });
 
-    // Notify the sender (confirmation)
-    if (assigner && assigned_to !== req.session.userId) {
+    // Notify the sender (confirmation) if they assigned to someone else
+    if (assigner && assignees.length > 0) {
       sendNotification(
         assigner,
         `Task Sent: ${title}`,
-        `You assigned a new task to ${assignee.full_name}: "${title}"\nUrgency: ${urgency || 'green'}\nDue: ${due_date || 'No due date'}\n\nDescription: ${description || 'None'}\n\nLog in: ${APP_URL}`,
-        `Task sent to ${assignee.full_name}: "${title}"\n${APP_URL}`
+        `You assigned a new task to ${assigneeNames}: "${title}"\nUrgency: ${urgency || 'green'}\nDue: ${due_date || 'No due date'}\n\nDescription: ${description || 'None'}\n\nLog in: ${APP_URL}`,
+        `Task sent to ${assigneeNames}: "${title}"\n${APP_URL}`
       );
     }
   }
@@ -129,31 +175,42 @@ router.put('/:id', (req, res) => {
 
   const completedAt = status === 'completed' ? new Date().toISOString() : task.completed_at;
 
+  // Only update assigned_to if it was explicitly passed
+  let primaryAssignee = task.assigned_to;
+  if (assigned_to !== undefined && assigned_to !== null) {
+    let assigneeIds = Array.isArray(assigned_to) ? assigned_to : [assigned_to];
+    assigneeIds = [...new Set(assigneeIds.map(Number).filter(n => !isNaN(n)))];
+    if (assigneeIds.length > 0) {
+      primaryAssignee = assigneeIds[0];
+      setTaskAssignees(req.params.id, assigneeIds);
+    }
+  }
+
   db.prepare(`
     UPDATE tasks SET
       title = COALESCE(?, title),
       description = COALESCE(?, description),
       urgency = COALESCE(?, urgency),
       due_date = COALESCE(?, due_date),
-      assigned_to = COALESCE(?, assigned_to),
+      assigned_to = ?,
       status = COALESCE(?, status),
       completed_at = ?
     WHERE id = ?
-  `).run(title, description, urgency, due_date, assigned_to, status, completedAt, req.params.id);
+  `).run(title, description, urgency, due_date, primaryAssignee, status, completedAt, req.params.id);
 
-  const updated = db.prepare(`
-    SELECT t.*, e.full_name as assigned_to_name, c.full_name as created_by_name
+  const updatedRow = db.prepare(`
+    SELECT t.*, c.full_name as created_by_name
     FROM tasks t
-    LEFT JOIN employees e ON t.assigned_to = e.id
     LEFT JOIN employees c ON t.created_by = c.id
     WHERE t.id = ?
   `).get(req.params.id);
+  const updated = enrichWithAssignees(updatedRow);
 
-  // Send notification when task is completed (notify both creator and assignee)
+  // Send notification when task is completed (notify creator and all assignees)
   if (status === 'completed' && task.status !== 'completed') {
     const creator = db.prepare('SELECT * FROM employees WHERE id = ?').get(task.created_by);
-    const assignee = db.prepare('SELECT * FROM employees WHERE id = ?').get(task.assigned_to);
     const completer = db.prepare('SELECT full_name FROM employees WHERE id = ?').get(req.session.userId);
+    const assigneeIds = db.prepare('SELECT employee_id FROM task_assignees WHERE task_id = ?').all(req.params.id).map(r => r.employee_id);
 
     if (completer) {
       // Notify the task creator (if they didn't complete it themselves)
@@ -166,15 +223,19 @@ router.put('/:id', (req, res) => {
         );
       }
 
-      // Notify the assignee (if they didn't complete it themselves and are different from creator)
-      if (assignee && task.assigned_to !== req.session.userId && task.assigned_to !== task.created_by) {
-        sendNotification(
-          assignee,
-          `Task Completed: ${task.title}`,
-          `${completer.full_name} has marked your task as complete: "${task.title}"\n\nCompleted: ${new Date().toLocaleString()}\n\nDescription: ${task.description || 'None'}\n\nLog in: ${APP_URL}`,
-          `${completer.full_name} completed: "${task.title}"\n${APP_URL}`
-        );
-      }
+      // Notify each assignee (skip completer and creator to avoid duplicates)
+      assigneeIds.forEach(aid => {
+        if (aid === req.session.userId || aid === task.created_by) return;
+        const assignee = db.prepare('SELECT * FROM employees WHERE id = ?').get(aid);
+        if (assignee) {
+          sendNotification(
+            assignee,
+            `Task Completed: ${task.title}`,
+            `${completer.full_name} has marked your task as complete: "${task.title}"\n\nCompleted: ${new Date().toLocaleString()}\n\nDescription: ${task.description || 'None'}\n\nLog in: ${APP_URL}`,
+            `${completer.full_name} completed: "${task.title}"\n${APP_URL}`
+          );
+        }
+      });
     }
   }
 
