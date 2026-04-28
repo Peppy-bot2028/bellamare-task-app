@@ -72,11 +72,33 @@ router.put('/employees/:id', (req, res) => {
 
 // Delete employee
 router.delete('/employees/:id', (req, res) => {
-  if (parseInt(req.params.id) === req.session.userId) {
+  const employeeId = parseInt(req.params.id);
+  if (employeeId === req.session.userId) {
     return res.status(400).json({ error: 'Cannot delete yourself' });
   }
-  db.prepare('DELETE FROM employees WHERE id = ?').run(req.params.id);
-  res.json({ message: 'Employee deleted' });
+
+  const employee = db.prepare('SELECT id FROM employees WHERE id = ?').get(employeeId);
+  if (!employee) return res.status(404).json({ error: 'Employee not found' });
+
+  try {
+    // Use transaction to clean up all references before deleting
+    const cleanup = db.transaction(() => {
+      // Delete time entries logged by this employee
+      db.prepare('DELETE FROM time_entries WHERE employee_id = ?').run(employeeId);
+      // Delete notes authored by this employee
+      db.prepare('DELETE FROM task_notes WHERE employee_id = ?').run(employeeId);
+      // Unlink tasks (set created_by/assigned_to to NULL instead of deleting tasks)
+      db.prepare('UPDATE tasks SET created_by = NULL WHERE created_by = ?').run(employeeId);
+      db.prepare('UPDATE tasks SET assigned_to = NULL WHERE assigned_to = ?').run(employeeId);
+      // Now delete the employee
+      db.prepare('DELETE FROM employees WHERE id = ?').run(employeeId);
+    });
+    cleanup();
+    res.json({ message: 'Employee deleted' });
+  } catch (err) {
+    console.error('Delete employee error:', err);
+    res.status(500).json({ error: 'Failed to delete employee: ' + err.message });
+  }
 });
 
 // Get carrier list
