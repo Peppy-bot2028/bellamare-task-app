@@ -11,6 +11,7 @@ async function init() {
   loadEmployees();
   setupEventListeners();
   setupAdminTabs();
+  checkOrphanedTasks();
 }
 
 function setupEventListeners() {
@@ -21,6 +22,8 @@ function setupEventListeners() {
 
   document.getElementById('addEmployeeBtn').addEventListener('click', () => openEmpModal());
   document.getElementById('empForm').addEventListener('submit', saveEmployee);
+  document.getElementById('reassignOrphanedBtn').addEventListener('click', openOrphanModal);
+  document.getElementById('orphanReassignBtn').addEventListener('click', reassignOrphaned);
 
   document.querySelectorAll('.modal-close, .modal-overlay').forEach(el => {
     el.addEventListener('click', () => {
@@ -135,6 +138,62 @@ async function deleteEmployee(id) {
   else {
     const data = await res.json();
     alert(data.error || 'Failed to delete');
+  }
+}
+
+// ---- Orphaned Tasks ----
+async function checkOrphanedTasks() {
+  const res = await fetch('/api/admin/orphaned-tasks');
+  if (!res.ok) return;
+  const orphaned = await res.json();
+  const btn = document.getElementById('reassignOrphanedBtn');
+  if (orphaned.length > 0) {
+    btn.style.display = '';
+    btn.textContent = `Reassign Orphaned Tasks (${orphaned.length})`;
+  } else {
+    btn.style.display = 'none';
+  }
+}
+
+async function openOrphanModal() {
+  const res = await fetch('/api/admin/orphaned-tasks');
+  const orphaned = await res.json();
+
+  const noCreator = orphaned.filter(t => !t.created_by).length;
+  const noAssignee = orphaned.filter(t => !t.assigned_to).length;
+  document.getElementById('orphanCount').textContent =
+    `Found ${orphaned.length} orphaned task(s): ${noCreator} missing creator, ${noAssignee} missing assignee.`;
+
+  // Populate employee dropdown
+  const empRes = await fetch('/api/admin/employees');
+  const employees = await empRes.json();
+  const sel = document.getElementById('orphanEmployee');
+  sel.innerHTML = employees.map(e => `<option value="${e.id}">${escapeHtml(e.full_name)}</option>`).join('');
+
+  document.getElementById('orphanModal').style.display = 'flex';
+}
+
+async function reassignOrphaned() {
+  const employee_id = parseInt(document.getElementById('orphanEmployee').value);
+  const mode = document.getElementById('orphanMode').value;
+  const empName = document.getElementById('orphanEmployee').selectedOptions[0].text;
+
+  if (!confirm(`Reassign all orphaned tasks to ${empName}?`)) return;
+
+  const res = await fetch('/api/admin/reassign-orphaned', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ employee_id, mode })
+  });
+
+  if (res.ok) {
+    const data = await res.json();
+    alert(`Success! ${data.message} to ${data.employee}`);
+    document.getElementById('orphanModal').style.display = 'none';
+    checkOrphanedTasks();
+  } else {
+    const data = await res.json();
+    alert(data.error || 'Failed to reassign');
   }
 }
 

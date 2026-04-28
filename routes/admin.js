@@ -106,4 +106,47 @@ router.get('/carriers', (req, res) => {
   res.json(Object.keys(CARRIER_GATEWAYS));
 });
 
+// Get count of orphaned tasks (where creator or assignee is NULL)
+router.get('/orphaned-tasks', (req, res) => {
+  const orphaned = db.prepare(`
+    SELECT id, title, urgency, due_date, status, created_by, assigned_to
+    FROM tasks
+    WHERE created_by IS NULL OR assigned_to IS NULL
+    ORDER BY created_at DESC
+  `).all();
+  res.json(orphaned);
+});
+
+// Reassign all orphaned tasks to a specific employee
+router.post('/reassign-orphaned', (req, res) => {
+  const { employee_id, mode } = req.body;
+  // mode: 'creator', 'assignee', or 'both'
+  if (!employee_id) return res.status(400).json({ error: 'Employee ID required' });
+
+  const employee = db.prepare('SELECT * FROM employees WHERE id = ?').get(employee_id);
+  if (!employee) return res.status(404).json({ error: 'Employee not found' });
+
+  let creatorCount = 0;
+  let assigneeCount = 0;
+
+  const update = db.transaction(() => {
+    if (mode === 'creator' || mode === 'both') {
+      const r = db.prepare('UPDATE tasks SET created_by = ? WHERE created_by IS NULL').run(employee_id);
+      creatorCount = r.changes;
+    }
+    if (mode === 'assignee' || mode === 'both') {
+      const r = db.prepare('UPDATE tasks SET assigned_to = ? WHERE assigned_to IS NULL').run(employee_id);
+      assigneeCount = r.changes;
+    }
+  });
+  update();
+
+  res.json({
+    message: `Reassigned ${creatorCount} as creator, ${assigneeCount} as assignee`,
+    creatorCount,
+    assigneeCount,
+    employee: employee.full_name
+  });
+});
+
 module.exports = router;

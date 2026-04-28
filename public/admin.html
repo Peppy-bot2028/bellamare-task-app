@@ -29,9 +29,43 @@
     <div id="employeesTab">
       <div class="admin-header">
         <h2>Employee Management</h2>
-        <button id="addEmployeeBtn" class="btn btn-primary">+ Add Employee</button>
+        <div style="display:flex;gap:8px;">
+          <button id="reassignOrphanedBtn" class="btn btn-sm btn-outline" style="display:none;">Reassign Orphaned Tasks</button>
+          <button id="addEmployeeBtn" class="btn btn-primary">+ Add Employee</button>
+        </div>
       </div>
       <div id="employeeList" class="employee-list"></div>
+    </div>
+
+    <!-- Reassign Orphaned Modal -->
+    <div id="orphanModal" class="modal" style="display:none;">
+      <div class="modal-overlay"></div>
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2>Reassign Orphaned Tasks</h2>
+          <button class="modal-close">&times;</button>
+        </div>
+        <p style="margin-bottom:12px;color:var(--text-light);font-size:14px;">
+          These tasks lost their creator or assignee when an employee was deleted. You can reassign them to another employee.
+        </p>
+        <div id="orphanCount" class="error-msg" style="background:var(--blue-bg);border-color:var(--blue-border);color:var(--blue);"></div>
+        <div class="form-group">
+          <label for="orphanEmployee">Reassign To</label>
+          <select id="orphanEmployee"></select>
+        </div>
+        <div class="form-group">
+          <label for="orphanMode">Reassign As</label>
+          <select id="orphanMode">
+            <option value="both">Both Creator & Assignee (recommended)</option>
+            <option value="creator">Creator only</option>
+            <option value="assignee">Assignee only</option>
+          </select>
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn btn-outline modal-close">Cancel</button>
+          <button type="button" id="orphanReassignBtn" class="btn btn-primary">Reassign</button>
+        </div>
+      </div>
     </div>
 
     <!-- Time Report Tab -->
